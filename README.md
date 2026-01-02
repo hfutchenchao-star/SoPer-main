@@ -26,8 +26,6 @@ This will automatically setup all dependencies.
 
 ## Datasets
 
-We preprocessed the following four datasets as our benchmark, which are placed in the data folder.
-
 ```
 data
   ├── processed_test
