@@ -25,14 +25,14 @@ class DEPModel(Qwen2ForCausalLM):
 
 
         self.gcn = SocialGCN_GBSR(
-            in_channels=1025,      # ✅ 输入特征维度 = 度(1) + embedding(1024)
-            hidden_channels=512,    # ✅ 隐层维度，可调
-            out_channels=512,       # ✅ 输出维度，用于传给上层模型
-            num_layers=3,          # ✅ 3层图卷积是一个经验值
-            dropout=0.1,           # ✅ GCN 正则化
-            gib_sigma=0.5,         # ✅ GIB 随机噪声标准差
-            projector_dim=1024,     # ✅ 投影头维度（如果你做 contrastive / mutual-info）
-            temperature=0.2,       # ✅ 对比学习温度
+            in_channels=1025,     
+            hidden_channels=512,   
+            out_channels=512,     
+            num_layers=3,         
+            dropout=0.1,           
+            gib_sigma=0.5,        
+            projector_dim=1024,     
+            temperature=0.2,       
         )
 
         self.gcn.to_empty(device=device)
@@ -80,28 +80,22 @@ class DEPModel(Qwen2ForCausalLM):
             **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         
-
-
-        # 🆕 添加这几行：如果参数为None，尝试从临时属性读取
         if embeddings is None and hasattr(self, '_temp_embeddings'):
             embeddings = self._temp_embeddings
         if graph_data is None and hasattr(self, '_temp_graph_data'):
             graph_data = self._temp_graph_data
         if inp_str is None and hasattr(self, '_temp_inp_strs'):
             inp_str = self._temp_inp_strs
-    
-        # 原有的检查逻辑
         if embeddings is None:
-            raise ValueError("❌ embeddings is None! 必须在 collate_fn 中提供。")
+            raise ValueError("embeddings is None! 必须在 collate_fn 中提供。")
         
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
 
-        # ✅ 关键修复：确保 embeddings 存在且在正确设备上
         if embeddings is None:
-            raise ValueError("❌ embeddings is None! 必须在 collate_fn 中提供。")
+            raise ValueError("embeddings is None! 必须在 collate_fn 中提供。")
         
         if isinstance(embeddings, list):
             embeddings = torch.tensor(embeddings, dtype=torch.float32)
@@ -131,9 +125,8 @@ class DEPModel(Qwen2ForCausalLM):
         num_graphs = 0
 
         if graph_data is None:
-            raise ValueError("❌ graph_data is None!")
+            raise ValueError("graph_data is None!")
 
-        # ✅ 处理批量图
         if isinstance(graph_data, list):
             graph_emb_list = []
             mask_list = []
@@ -154,7 +147,7 @@ class DEPModel(Qwen2ForCausalLM):
 
                 emb_original = g_res["emb_before"]
                 emb_masked = g_res["emb_after"]
-                edge_mask_raw = g_res["edge_mask"]  # ✅ 修改点
+                edge_mask_raw = g_res["edge_mask"]  
 
                 center_emb_ori = emb_original[center_local].unsqueeze(0)
                 center_emb_mask = emb_masked[center_local].unsqueeze(0)
@@ -182,7 +175,6 @@ class DEPModel(Qwen2ForCausalLM):
                     avg_w = float(sum(ws) / len(ws)) if len(ws) > 0 else 0.0
                     weights_in_order.append(avg_w)
 
-                # ✅ padding
                 if len(weights_in_order) == 0:
                     pad_weights = [0.0] * max_friend_len
                 else:
@@ -194,11 +186,10 @@ class DEPModel(Qwen2ForCausalLM):
             edge_mask = torch.stack(mask_list, dim=0)
             hsic_loss_avg = hsic_loss_total / max(num_graphs, 1)
 
-        # ✅ 单样本分支
         else:
             g_data, center_local, node_names = _to_pyg_data(graph_data)
             if g_data is None:
-                raise ValueError("❌ 单样本图数据为空。")
+                raise ValueError("单样本图数据为空。")
 
             g_res = self.gcn.forward(
                 g_data.x.to(self.device),
@@ -207,9 +198,9 @@ class DEPModel(Qwen2ForCausalLM):
                 return_all=True
             )
 
-            emb_original = g_res["emb_before"]  # ✅ 修改
-            emb_masked = g_res["emb_after"]  # ✅ 修改
-            edge_mask_raw = g_res["edge_mask"]  # ✅ 修改
+            emb_original = g_res["emb_before"]  
+            emb_masked = g_res["emb_after"]  
+            edge_mask_raw = g_res["edge_mask"]  
 
             center_emb_ori = emb_original[center_local].unsqueeze(0)
             center_emb_mask = emb_masked[center_local].unsqueeze(0)
@@ -240,10 +231,8 @@ class DEPModel(Qwen2ForCausalLM):
 
             edge_mask = torch.tensor(pad_weights, dtype=torch.float32, device=self.device).unsqueeze(0)
 
-        # === 替换权重到输入文本 ===
         processed_inp_strs = []
 
-        # ✅ edge_mask 现在是 [B, 16] tensor
         for bidx in range(edge_mask.size(0)):
             weights = edge_mask[bidx].detach().cpu().tolist()
             text = inp_str[bidx] if isinstance(inp_str, list) else inp_str
@@ -256,15 +245,12 @@ class DEPModel(Qwen2ForCausalLM):
                 text = text.replace("[Friend Influence Score]: 1.0", f"[Friend Influence Score]: {w:.4f}", 1)
             processed_inp_strs.append(text)
 
-        # === Tokenize ===
         all_input_ids, all_attention_masks, all_labels = [], [], []
 
-        # ✅ 移除 tqdm，避免 DeepSpeed 冲突
         for idx, text in enumerate(processed_inp_strs):
             if not text:
                 continue
 
-            # === 编码输入 ===
             inputs = self.llm_tokenizer(
                 text=text,
                 max_length=max_length,
@@ -273,11 +259,10 @@ class DEPModel(Qwen2ForCausalLM):
                 return_tensors=None,
             )
 
-            # === 仅在训练时才编码目标 ===
             if training:
                 out_text = out_str[idx] if isinstance(out_str, list) else out_str
                 targets = self.llm_tokenizer(
-                    text=out_text,  # ✅ 显式指定 text 参数，兼容新版本transformers
+                    text=out_text,  
                     max_length=max_length,
                     truncation=True,
                     padding=False,
@@ -291,13 +276,12 @@ class DEPModel(Qwen2ForCausalLM):
                     self.llm_tokenizer.eos_token_id]
                 max_len = total_max_length
             else:
-                # === 推理模式：不需要 targets ===
+
                 input_id = inputs["input_ids"]
                 attention_mask_list = inputs["attention_mask"]
                 labels_list = [-100] * len(input_id)
                 max_len = max_length
 
-            # === 统一padding / 截断 ===
             pad_len = max_len - len(input_id)
             if pad_len > 0:
                 input_id = [self.llm_tokenizer.pad_token_id] * pad_len + input_id
@@ -325,18 +309,13 @@ class DEPModel(Qwen2ForCausalLM):
 
         # === Graph embedding ===
         if graph_emb is not None:
-
-
-            # === 临时安全修复：避免 bfloat16 小 batch Linear 崩溃 ===
             orig_dtype = graph_emb.dtype
-            graph_emb = graph_emb.to(torch.float32)               # ✅ 强制转 float32，绕过 CUDA bug
-            self.align_mlp_graph = self.align_mlp_graph.to(torch.float32)  # ✅ 保证权重同类型
+            graph_emb = graph_emb.to(torch.float32)              
+            self.align_mlp_graph = self.align_mlp_graph.to(torch.float32) 
 
-            graph_emb = self.align_mlp_graph(graph_emb)           # 这里不会再炸
-            graph_emb = graph_emb.to(orig_dtype)                  # ✅ 转回原 dtype（bfloat16），以兼容后续部分
+            graph_emb = self.align_mlp_graph(graph_emb)        
+            graph_emb = graph_emb.to(orig_dtype)            
             graph_emb = graph_emb.unsqueeze(1)
-
-        # === 替换特殊 token ===
         graph_token_id = self.llm_tokenizer.convert_tokens_to_ids("[SOCIAL_GRAPH_TOKEN]")
         friend_token_ids = self.llm_tokenizer.convert_tokens_to_ids([f"[FRIEND_TOKEN_{i}]" for i in range(MAX_FRIEND_LEN)])
 
@@ -429,7 +408,6 @@ class DEPModel(Qwen2ForCausalLM):
         if labels is None:
             return torch.tensor(0.0, device=logits.device)
         
-        # ✅ 防止维度不匹配
         if logits.size(1) != labels.size(1):
             min_len = min(logits.size(1), labels.size(1))
             logits = logits[:, :min_len, :]
