@@ -3,7 +3,7 @@
 
 ## Overview
 
-![method](images/SoPer.pdf)
+![method](images/soper.png)
 
 ## Setup
 
