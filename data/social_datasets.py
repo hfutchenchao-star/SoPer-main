@@ -11,7 +11,7 @@ class SocialGraphDataset(Dataset):
         self.graph_dict = np.load(npy_path, allow_pickle=True).item()
         self.keys = list(self.graph_dict.keys())
         self.use_degree_feat = use_degree_feat
-        self.emb_root = emb_root  # e.g. /root/autodl-tmp/DEP-main/datasets/embeddings_yelp
+        self.emb_root = emb_root  
 
     def len(self):
         return len(self.keys)
