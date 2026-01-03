@@ -16,7 +16,7 @@ OUTPUT_DIR = "your_path"
 MODEL_NAME = "BAAI/bge-m3"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-CACHE_DIR = "/root/autodl-tmp/DEP-main/model_point"
+CACHE_DIR = "your_path"
 
 print(f"Loading embedding model: {MODEL_NAME}")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=CACHE_DIR)
