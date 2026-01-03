@@ -26,7 +26,7 @@ This will automatically setup all dependencies.
 
 ## Datasets
 
-We use the Yelp dataset as our primary benchmark. To prepare the data for training and evaluation, please follow the preprocessing pipeline described below. 
+To prepare the data for training and evaluation, please follow the preprocessing pipeline described below. 
 
 > **Note:** Please ensure all scripts are executed from the project root and update the local file paths within the scripts to match your environment.
 
@@ -34,7 +34,7 @@ We use the Yelp dataset as our primary benchmark. To prepare the data for traini
 
 Follow these steps in order to generate the required datasets:
 
-1. **Filter Dataset**: Screen the raw Yelp dataset based on cold-start constraints (e.g., minimum record requirements).
+1. **Filter Dataset**: Screen the raw dataset based on cold-start constraints.
    ```bash
    python SoPer-main/filter_data/filter_yelp.py
 2. **Encode Reviews**: Generate embeddings for the filtered review text using the pre-trained encoder.
