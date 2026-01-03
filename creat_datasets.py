@@ -25,17 +25,14 @@ def get_max_friend_len(json_path_list):
 # ======================
 set_seed(42)
 
-DATA_DIR = "/root/autodl-tmp/DEP-main/datasets"
-OUT_DIR = "/root/autodl-tmp/DEP-main/data"
+DATA_DIR = "your_path"
+OUT_DIR = "your_path"
 os.makedirs(OUT_DIR, exist_ok=True)
 
 TRAIN_PATH = os.path.join(DATA_DIR, "train.json")
 VAL_PATH = os.path.join(DATA_DIR, "val.json")
 TEST_PATH = os.path.join(DATA_DIR, "test.json")
-
-# Step 1. 计算最大好友数
 MAX_FRIENDS = get_max_friend_len([VAL_PATH, TEST_PATH])
-print(f"✅ 全局最大好友数: {MAX_FRIENDS}")
 
 # Step 2. 初始化 Tokenizer
 llm_model_name = "Qwen/Qwen2.5-7B-Instruct"
@@ -67,9 +64,6 @@ test_data = load_json(TEST_PATH)
 
 print(f"Train: {len(train_data)} | Val: {len(val_data)} | Test: {len(test_data)}")
 
-# ======================
-# 转换为 HuggingFace Dataset
-# ======================
 def to_hf_dataset(data_list):
     return Dataset.from_dict({
         "center_user_id": [d["center_user_id"] for d in data_list],
@@ -86,10 +80,7 @@ train_dataset.save_to_disk(os.path.join(OUT_DIR, "dataset_train"))
 val_dataset.save_to_disk(os.path.join(OUT_DIR, "dataset_val"))
 test_dataset.save_to_disk(os.path.join(OUT_DIR, "dataset_test"))
 
-print("\n✅ Datasets saved successfully!")
-
-# Step 2. 构造用户历史 embedding 映射
-# ======================
+print("\n Datasets saved successfully!")
 
 print("Building user_his_emb_map & user_prof_mean_emb_map ...")
 
@@ -116,17 +107,14 @@ for center_uid in tqdm(center_users, desc="Loading center/friend embeddings"):
             if emb.ndim == 1:
                 emb = emb.unsqueeze(0)
         except Exception as e:
-            print(f"⚠️ 加载失败 {fpath}: {e}")
+            print(f"加载失败 {fpath}: {e}")
             continue
 
         user_his_emb_map[center_uid][uid] = emb
         user_prof_mean_emb_map[center_uid][uid] = emb.mean(dim=0, keepdim=True)
 
-print(f"✅ 已加载中心用户数: {len(user_his_emb_map)}")
+print(f"已加载中心用户数: {len(user_his_emb_map)}")
 
-# ======================
-# Step 3. 构建个性化数据集
-# ======================
 print("Processing into personalized format...")
 
 train_pd = PersonalDataset(
@@ -162,4 +150,4 @@ test_pd = PersonalDataset(
 hf_test = convert_to_dataset(test_pd)
 hf_test.save_to_disk(os.path.join(OUT_DIR, "processed_test"))
 
-print("\n🎯 All done! Personalized Yelp datasets ready.")
+print("\nAll done! Personalized Yelp datasets ready.")
