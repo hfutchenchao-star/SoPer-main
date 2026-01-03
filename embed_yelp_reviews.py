@@ -10,29 +10,21 @@ from collections import defaultdict
 # ======================
 # 路径配置
 # ======================
-REVIEW_PATH = "/root/autodl-tmp/DEP-main/datasets/coldstart_reviews.json"
-OUTPUT_DIR = "/root/autodl-tmp/DEP-main/datasets/embeddings_yelp"
+REVIEW_PATH = "your_path"
+OUTPUT_DIR = "your_path"
 
 MODEL_NAME = "BAAI/bge-m3"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 CACHE_DIR = "/root/autodl-tmp/DEP-main/model_point"
 
-# ======================
-# 加载模型与分词器（指定缓存目录）
-# ======================
 print(f"Loading embedding model: {MODEL_NAME}")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=CACHE_DIR)
 model = AutoModel.from_pretrained(MODEL_NAME, cache_dir=CACHE_DIR, device_map="auto")
 model.eval()
 
-
-# ======================
-# 工具函数
-# ======================
 @torch.no_grad()
 def get_embeddings(texts, batch_size=64):
-    """将文本批量编码为embedding"""
     all_embs = []
     for i in range(0, len(texts), batch_size):
         batch_txts = texts[i:i + batch_size]
@@ -47,17 +39,11 @@ def get_embeddings(texts, batch_size=64):
         gc.collect()
     return torch.cat(all_embs, dim=0)
 
-
-# ======================
-# Step 1. 加载 Yelp 评论数据
-# ======================
 print(f"Loading Yelp coldstart dataset from {REVIEW_PATH}...")
 with open(REVIEW_PATH, "r", encoding="utf-8") as f:
     data = json.load(f)
 
 print(f"Total records loaded: {len(data)}")
-
-# 分组结构： {center_user_id: {user_id: [ {text, date}, ... ] }}
 grouped_reviews = defaultdict(lambda: defaultdict(list))
 
 for r in tqdm(data, desc="Grouping reviews"):
@@ -67,8 +53,6 @@ for r in tqdm(data, desc="Grouping reviews"):
     date = r.get("date", "")
     if text:
         grouped_reviews[cid][uid].append({"text": text, "date": date})
-
-# ✅ Step 1.1 对每个用户的评论按时间升序排序
 for cid in grouped_reviews:
     for uid in grouped_reviews[cid]:
         grouped_reviews[cid][uid] = sorted(
@@ -93,7 +77,6 @@ for cid, user_reviews in tqdm(grouped_reviews.items(), desc="Processing center u
             continue
 
         try:
-            # ✅ 按时间顺序提取文本
             texts = [r["text"] for r in reviews]
             embs = get_embeddings(texts, batch_size=64)
             torch.save(embs, save_path)
