@@ -5,10 +5,7 @@ from torch_geometric.data import Data, Dataset
 from torch_geometric.utils import to_undirected
 
 class SocialGraphDataset(Dataset):
-    """
-    加载每个中心用户的一跳社交子图 + 节点语义特征（均值 embedding）
-    节点特征: x = [degree, mean_embedding]
-    """
+
     def __init__(self, npy_path, emb_root, use_degree_feat=True, transform=None):
         super().__init__(None, transform, None)
         self.graph_dict = np.load(npy_path, allow_pickle=True).item()
@@ -25,7 +22,6 @@ class SocialGraphDataset(Dataset):
         nodes = g["nodes"]
         edges = g["edges"]
 
-        # ========== 构建边索引 ==========
         nid = {u: i for i, u in enumerate(nodes)}
         edge_list = [[nid[u], nid[v]] for u, v in edges if u in nid and v in nid]
 
@@ -35,7 +31,6 @@ class SocialGraphDataset(Dataset):
             edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
             edge_index = to_undirected(edge_index)
 
-        # ========== 计算节点度特征 ==========
         N = len(nodes)
         deg = torch.bincount(edge_index[0], minlength=N).float().unsqueeze(1)
         deg_norm = deg / (deg.max() + 1e-6) if self.use_degree_feat else torch.ones_like(deg)
@@ -45,10 +40,9 @@ class SocialGraphDataset(Dataset):
         for uid in nodes:
             emb_path = os.path.join(self.emb_root, center_uid, f"{uid}.emb")
             if not os.path.exists(emb_path):
-                raise FileNotFoundError(f"❌ 找不到节点 {uid} 的 embedding 文件: {emb_path}")
+                raise FileNotFoundError(f"找不到节点 {uid} 的 embedding 文件: {emb_path}")
 
             try:
-                # ✅ 兼容 torch.save 保存的二进制 embedding
                 try:
                     tensor_data = torch.load(emb_path, map_location="cpu")
                     if isinstance(tensor_data, torch.Tensor):
@@ -58,7 +52,6 @@ class SocialGraphDataset(Dataset):
                     else:
                         raise ValueError(f"未知embedding类型: {type(tensor_data)}")
                 except Exception:
-                    # ✅ 兼容旧的纯文本 embedding（np.loadtxt）
                     arr = np.loadtxt(emb_path)
 
                 # === 平均多个评论 embedding ===
@@ -67,7 +60,7 @@ class SocialGraphDataset(Dataset):
                 mean_emb = arr.mean(axis=0)
 
             except Exception as e:
-                raise RuntimeError(f"❌ 加载 {emb_path} 时出错: {e}")
+                raise RuntimeError(f"加载 {emb_path} 时出错: {e}")
 
             embs.append(mean_emb)
 
