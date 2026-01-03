@@ -35,7 +35,6 @@ class SocialGraphDataset(Dataset):
         deg = torch.bincount(edge_index[0], minlength=N).float().unsqueeze(1)
         deg_norm = deg / (deg.max() + 1e-6) if self.use_degree_feat else torch.ones_like(deg)
 
-        # ========== 加载节点 embedding ==========
         embs = []
         for uid in nodes:
             emb_path = os.path.join(self.emb_root, center_uid, f"{uid}.emb")
@@ -54,7 +53,6 @@ class SocialGraphDataset(Dataset):
                 except Exception:
                     arr = np.loadtxt(emb_path)
 
-                # === 平均多个评论 embedding ===
                 if arr.ndim == 1:
                     arr = arr[np.newaxis, :]
                 mean_emb = arr.mean(axis=0)
@@ -66,10 +64,8 @@ class SocialGraphDataset(Dataset):
 
         embs = torch.tensor(np.stack(embs), dtype=torch.float32)
 
-        # ========== 拼接结构度特征 + 语义特征 ==========
         x = torch.cat([deg_norm, embs], dim=1)
 
-        # ========== 构建 PyG Data ==========
         center_local = nid[center_uid]
         data = Data(x=x, edge_index=edge_index)
         data.center_uid = center_uid
