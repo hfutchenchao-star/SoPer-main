@@ -16,14 +16,14 @@ import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", choices=["infer", "eval"], default="eval", required=True, help="运行模式：infer 或 eval")
-parser.add_argument("--data_dir", type=str, default="/root/autodl-tmp/my_project/data/processed_test",
+parser.add_argument("--data_dir", type=str, default="your_path",
                     help="测试数据路径")
 parser.add_argument("--output_dir", type=str, default="output", help="输出文件夹路径")
 parser.add_argument("--llm_backbone", type=str,
-                    default="/root/autodl-tmp/my_project/model_point/models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28",
+                    default="your_path",
                     help="主干模型（未训练的LLM）路径")
 parser.add_argument("--ckpt_dir", type=str,
-                    default="/root/autodl-tmp/my_project/output/checkpoint-1125",
+                    default="your_path",
                     help="训练后保存的checkpoint文件夹")
 args = parser.parse_args()
 
@@ -33,13 +33,13 @@ os.makedirs(args.output_dir, exist_ok=True)
 def postprocess_output(text):
     text = text.strip()
     text = text.replace("\r", " ").replace("\n", " ")
-    text = " ".join(text.split())     # 去掉连续空格
+    text = " ".join(text.split())     
     return text
 
-print("🔧 Loading tokenizer ...")
+print("Loading tokenizer ...")
 tokenizer = AutoTokenizer.from_pretrained(args.ckpt_dir, trust_remote_code=True)
 
-print(f"🔧 Loading base model from: {args.llm_backbone}")
+print(f"Loading base model from: {args.llm_backbone}")
 personal_model = DEPModel.from_pretrained(
     pretrained_model_name_or_path=args.llm_backbone,
     tokenizer=tokenizer,
@@ -123,7 +123,6 @@ if args.mode == "infer":
 
             predictions.extend(texts)
 
-    # === 保存预测结果 ===
     output_path = os.path.join(args.output_dir, "predictions-justhavefriendsreviewandweight.txt")
     print(f"Saving predictions to {output_path}")
 
@@ -146,9 +145,7 @@ elif args.mode == "eval":
         blocks = f.read().strip().split("---------------------------------")
         predictions = [b.strip() for b in blocks if b.strip()]
 
-
     references = list(dataset["out_str"])
-
 
     print("Evaluating results ...")
     bleu_metric = evaluate.load("sacrebleu")
