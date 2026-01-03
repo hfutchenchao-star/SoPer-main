@@ -17,9 +17,6 @@ set_seed(42)
 
 class CustomTrainer(Seq2SeqTrainer):
     def _save_checkpoint(self, model, trial, metrics=None):
-        """
-        只保存你训练的 5 个模块: sae, align_mlp_user, align_mlp_friend, align_mlp_graph, gcn
-        """
         checkpoint_folder = f"output/checkpoint-{self.state.global_step}"
         os.makedirs(checkpoint_folder, exist_ok=True)
 
@@ -58,10 +55,10 @@ def print_trainable_parameters(model):
 def custom_collate_fn(batch):
     collated = {}
 
-    # === 处理图数据 ===
+
     collated["graph_data"] = [b.get("graph_data", None) for b in batch]
 
-    # === 处理 embeddings（关键修复）===
+
     if "embeddings" in batch[0]:
         emb_list = []
         for b in batch:
@@ -74,8 +71,7 @@ def custom_collate_fn(batch):
                 raise TypeError(f"embeddings type not supported: {type(emb)}")
             emb_list.append(emb)
         collated["embeddings"] = torch.stack(emb_list, dim=0)
-    
-    # === 其他键 ===
+
     keys = set().union(*[b.keys() for b in batch])
     keys.discard("graph_data")
     keys.discard("embeddings")
@@ -125,7 +121,7 @@ training_args = Seq2SeqTrainingArguments(
     bf16=True,
     deepspeed="deepspeed/ds_z1_config.json",
     report_to="wandb",
-    run_name="cold-start-nouserjilu",
+    run_name="cold-start",
     remove_unused_columns=False,
     metric_for_best_model="loss",
     greater_is_better=False,
@@ -156,3 +152,4 @@ if dist.is_initialized():
 
 
 sys.exit(0)
+
