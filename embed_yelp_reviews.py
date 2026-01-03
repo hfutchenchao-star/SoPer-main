@@ -60,10 +60,6 @@ for cid in grouped_reviews:
             key=lambda x: x["date"]
         )
 
-
-# ======================
-# Step 2. 遍历每个中心用户，分别为ego网络中的每个用户生成embedding
-# ======================
 for cid, user_reviews in tqdm(grouped_reviews.items(), desc="Processing center users"):
     center_dir = os.path.join(OUTPUT_DIR, cid)
     os.makedirs(center_dir, exist_ok=True)
@@ -84,5 +80,5 @@ for cid, user_reviews in tqdm(grouped_reviews.items(), desc="Processing center u
             print(f"[warning] failed to embed {uid}: {e}")
             continue
 
-print("\n✅ All embeddings have been generated successfully (with time-sorted reviews)!")
+print("\nAll embeddings have been generated successfully (with time-sorted reviews)!")
 print(f"Saved under directory → {OUTPUT_DIR}")
