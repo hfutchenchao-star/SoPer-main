@@ -25,7 +25,7 @@ class PersonalDataset(torch.utils.data.Dataset):
         self.training = training
         self.user_his_emb_map = user_his_emb_map
         self.max_friend_len = max_friend_len
-        SOCIAL_GRAPH_PATH = "/root/autodl-tmp/DEP-main/datasets/social_graphs.npy"
+        SOCIAL_GRAPH_PATH = "your_path"
 
         if not os.path.exists(SOCIAL_GRAPH_PATH):
             raise FileNotFoundError(f" Graph file not found: {SOCIAL_GRAPH_PATH}")
@@ -294,3 +294,4 @@ def clean_text(text: str) -> str:
     text = " ".join(text.split())
 
     return text.strip()
+
