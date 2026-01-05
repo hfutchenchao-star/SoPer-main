@@ -116,7 +116,7 @@ for uid in tqdm(candidate_users, desc="filtering centers"):
             total_reviews += n_reviews
 
     num_mutual = len(valid_mutual)
-    if num_mutual < 3 or num_mutual > 8:
+    if num_mutual < 3 or num_mutual > 6:
         continue
 
     if 64 <= total_reviews <= 250:
