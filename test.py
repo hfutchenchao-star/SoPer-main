@@ -123,7 +123,7 @@ if args.mode == "infer":
 
             predictions.extend(texts)
 
-    output_path = os.path.join(args.output_dir, "predictions-justhavefriendsreviewandweight.txt")
+    output_path = os.path.join(args.output_dir, "predictions.txt")
     print(f"Saving predictions to {output_path}")
 
     with open(output_path, "w", encoding="utf-8") as f:
@@ -135,7 +135,7 @@ if args.mode == "infer":
 
 elif args.mode == "eval":
     #predictions_path = os.path.join(args.output_dir, "predictions.txt")
-    predictions_path = "/root/autodl-tmp/my_project/output/predictions-justhavefriendsreviewandweight.txt"
+    predictions_path = "your_path"
 
     if not os.path.exists(predictions_path):
         raise FileNotFoundError(f"{predictions_path} not found. 请先运行 `--mode infer` 生成预测结果。")
@@ -173,7 +173,7 @@ elif args.mode == "eval":
         print(f"{k:<10}: {v:.4f}")
 
     # === 保存结果到 JSON ===
-    result_path = os.path.join(args.output_dir, "eval_results-justhavefriendsreviewandweight.json")
+    result_path = os.path.join(args.output_dir, "eval_results.json")
     with open(result_path, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=4)
     print(f"Results saved to {result_path}")
