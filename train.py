@@ -99,7 +99,7 @@ personal_model = DEPModel.from_pretrained(
     attn_implementation="flash_attention_2",
     training=True,
     tokenizer=llm_tokenizer,
-    cache_dir="/root/autodl-tmp/my_project/model_point",
+    cache_dir="your_path",
 )
 personal_model.resize_token_embeddings(len(llm_tokenizer))
 
@@ -152,4 +152,5 @@ if dist.is_initialized():
 
 
 sys.exit(0)
+
 
