@@ -8,8 +8,8 @@ from collections import defaultdict
 # ======================
 # 路径配置
 # ======================
-BASE_DIR = r"your_path"
-OUT_DIR = r"your_path"
+BASE_DIR = r"your_path"  # 请替换为你的实际输入路径
+OUT_DIR = r"your_path"   # 请替换为你的实际输出路径
 
 USER_PATH = os.path.join(BASE_DIR, "yelp_academic_dataset_user.json")
 REVIEW_PATH = os.path.join(BASE_DIR, "yelp_academic_dataset_review.json")
@@ -19,12 +19,15 @@ OUT_TEXT_JSON = os.path.join(OUT_DIR, "coldstart_reviews.json")
 OUT_GRAPH_NPY = os.path.join(OUT_DIR, "social_graphs.npy")
 
 MAX_USERS = 4000
+
+# ======================
+# 辅助函数
+# ======================
 def load_json_lines(path):
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
             if line.strip():
                 yield json.loads(line)
-
 
 def parse_friends_field(raw):
     if not raw or raw == "None":
@@ -33,7 +36,6 @@ def parse_friends_field(raw):
         return set(raw)
     return set(x for x in raw.split(", ") if x)
 
-
 def parse_categories_field(raw):
     if not raw or raw == "None":
         return []
@@ -41,6 +43,9 @@ def parse_categories_field(raw):
         return raw
     return [x for x in raw.split(", ") if x]
 
+# ======================
+# 1. 加载用户 (Users)
+# ======================
 print("Loading users...")
 t0 = time.time()
 user_friends = {}
@@ -54,6 +59,9 @@ for u in tqdm(load_json_lines(USER_PATH), desc="users"):
 
 print(f"Total users loaded: {len(user_friends)}  |  {time.time()-t0:.1f}s")
 
+# ======================
+# 2. 加载商家 (Businesses)
+# ======================
 print("Loading businesses...")
 t1 = time.time()
 
@@ -68,6 +76,10 @@ for b in tqdm(load_json_lines(BUSINESS_PATH), desc="businesses"):
     }
 
 print(f"Total businesses loaded: {len(business_info)}  |  {time.time()-t1:.1f}s")
+
+# ======================
+# 3. 加载评论 (Reviews)
+# ======================
 print("Loading reviews...")
 t2 = time.time()
 user_reviews = defaultdict(list)
@@ -75,6 +87,7 @@ user_reviews = defaultdict(list)
 for r in tqdm(load_json_lines(REVIEW_PATH), desc="reviews"):
     uid = r["user_id"]
     text = r["text"].strip()
+    # 简单的长度过滤
     if len(text) < 5:
         continue
 
@@ -88,13 +101,17 @@ for r in tqdm(load_json_lines(REVIEW_PATH), desc="reviews"):
 
 print(f"Total users with valid reviews: {len(user_reviews)}  |  {time.time()-t2:.1f}s")
 
+# ======================
+# 4. 筛选冷启动中心用户
+# ======================
 print("Selecting cold-start users (mutual friends only, each friend≥8 valid reviews)...")
 t3 = time.time()
 
 center_users = []
 center_to_mutual_friends = {}
 
-candidate_users = [uid for uid, rs in user_reviews.items() if 4 <= len(rs) <= 30]
+
+candidate_users = [uid for uid, rs in user_reviews.items() if 4 <= len(rs) <= 6]
 print(f"Initial candidates: {len(candidate_users)}")
 
 for uid in tqdm(candidate_users, desc="filtering centers"):
@@ -104,6 +121,7 @@ for uid in tqdm(candidate_users, desc="filtering centers"):
 
     if len(friends) > 200:
         continue
+    
     mutual = {f for f in friends if uid in user_friends.get(f, ())}
 
     valid_mutual = set()
@@ -116,7 +134,8 @@ for uid in tqdm(candidate_users, desc="filtering centers"):
             total_reviews += n_reviews
 
     num_mutual = len(valid_mutual)
-    if num_mutual < 3 or num_mutual > 6:
+    
+    if num_mutual < 3 or num_mutual > 8:
         continue
 
     if 64 <= total_reviews <= 250:
@@ -128,7 +147,10 @@ for uid in tqdm(candidate_users, desc="filtering centers"):
 
 print(f"Eligible cold-start users found: {len(center_users)}  |  {time.time()-t3:.1f}s")
 
-print("Building graphs and streaming ordered reviews...")
+# ======================
+# 5. 构建图并应用时间过滤
+# ======================
+print("Building graphs and streaming ordered reviews with TEMPORAL FILTER...")
 t4 = time.time()
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -136,9 +158,15 @@ graph_dict = {}
 
 with open(OUT_TEXT_JSON, "w", encoding="utf-8") as f_out:
     for center_uid in tqdm(center_users, desc="center_graphs"):
-        mutual_friends = center_to_mutual_friends[center_uid]
+        
+        c_reviews = user_reviews.get(center_uid, [])
+        c_reviews_sorted = sorted(c_reviews, key=lambda x: x["date"])
 
+        cutoff_date = c_reviews_sorted[-3]["date"]
+
+        mutual_friends = center_to_mutual_friends[center_uid]
         ordered_nodes = [center_uid] + [f for f in mutual_friends if f != center_uid]
+        
         edges = []
         for f in mutual_friends:
             edges.append((center_uid, f))
@@ -151,11 +179,18 @@ with open(OUT_TEXT_JSON, "w", encoding="utf-8") as f_out:
                     edges.append((f1, f2))
 
         ordered_edges = list(dict.fromkeys(edges))
-
         graph_dict[center_uid] = {"nodes": ordered_nodes, "edges": ordered_edges}
 
         for uid in ordered_nodes:
-            for r in user_reviews.get(uid, []):
+
+            current_reviews = user_reviews.get(uid, [])
+            
+            for r in current_reviews:
+
+                if uid != center_uid:
+                    if r["date"] >= cutoff_date:
+                        continue 
+
                 bid = r["business_id"]
                 biz = business_info.get(bid, {})
 
@@ -174,8 +209,11 @@ with open(OUT_TEXT_JSON, "w", encoding="utf-8") as f_out:
 
 print(f"Reviews NDJSON written to: {OUT_TEXT_JSON}  |  {time.time()-t4:.1f}s")
 
+# ======================
+# 6. 保存图文件
+# ======================
 t5 = time.time()
 np.save(OUT_GRAPH_NPY, graph_dict, allow_pickle=True)
 print(f"Saved social graphs → {OUT_GRAPH_NPY}  |  {time.time()-t5:.1f}s")
 
-print("Finished: All reviews contain business_name.")
+print("Finished: All reviews contain business_name and strict temporal filtering applied.")
